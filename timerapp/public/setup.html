@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyTracker — 管理者セットアップ</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter','Noto Sans JP',sans-serif; background:#0f0e1a; color:#eee; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+    .container { max-width:440px; width:100%; }
+    h1 { text-align:center; margin-bottom:8px; background:linear-gradient(135deg,hsl(260,85%,65%),hsl(200,90%,55%)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    p.sub { text-align:center; color:#888; font-size:14px; margin-bottom:24px; }
+    .card { background:hsla(250,25%,14%,0.6); border:1px solid hsla(250,20%,40%,0.15); border-radius:16px; padding:24px; margin-bottom:16px; }
+    label { display:block; font-size:13px; color:#999; margin-bottom:4px; }
+    input { width:100%; padding:10px 14px; background:hsla(250,20%,18%,0.8); border:1px solid hsla(250,20%,40%,0.2); border-radius:8px; color:#eee; font-size:15px; outline:none; margin-bottom:16px; }
+    input:focus { border-color:hsl(260,85%,65%); }
+    button { width:100%; padding:12px; border:none; border-radius:999px; background:linear-gradient(135deg,hsl(260,85%,65%),hsl(200,90%,55%)); color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:0.5; }
+    #status { margin-top:16px; padding:12px; border-radius:8px; font-size:14px; text-align:center; display:none; }
+    .success { background:hsla(160,70%,45%,0.12); color:hsl(160,70%,45%); display:block!important; }
+    .error { background:hsla(0,75%,60%,0.12); color:hsl(0,75%,60%); display:block!important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>管理者セットアップ</h1>
+    <p class="sub">初回のみ：管理者アカウントを作成します</p>
+    <div class="card">
+      <label>管理者ID</label>
+      <input type="text" id="adminId" value="admin" />
+      <label>パスワード（6文字以上）</label>
+      <input type="password" id="adminPw" placeholder="管理者パスワードを入力" />
+      <label>パスワード確認</label>
+      <input type="password" id="adminPw2" placeholder="もう一度入力" />
+      <button id="btnCreate">管理者アカウントを作成</button>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
+    import { getAuth, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+    import { getFirestore, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDkNHm4wYj1WEGkxXq-clTPtyhkexTDFkM",
+      authDomain: "timerapp-acf18.firebaseapp.com",
+      projectId: "timerapp-acf18",
+      storageBucket: "timerapp-acf18.firebasestorage.app",
+      messagingSenderId: "691550819038",
+      appId: "1:691550819038:web:a62aede51e9da71688284f",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const DOMAIN = 'studytracker.app';
+
+    document.getElementById('btnCreate').addEventListener('click', async () => {
+      const id = document.getElementById('adminId').value.trim();
+      const pw = document.getElementById('adminPw').value;
+      const pw2 = document.getElementById('adminPw2').value;
+      const status = document.getElementById('status');
+      const btn = document.getElementById('btnCreate');
+
+      status.className = ''; status.style.display = 'none';
+
+      if (!id) { showErr('IDを入力してください'); return; }
+      if (pw.length < 6) { showErr('パスワードは6文字以上にしてください'); return; }
+      if (pw !== pw2) { showErr('パスワードが一致しません'); return; }
+
+      btn.disabled = true; btn.textContent = '作成中...';
+
+      try {
+        const email = `${id}@${DOMAIN}`;
+        const cred = await createUserWithEmailAndPassword(auth, email, pw);
+
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          studentId: id,
+          displayName: '管理者',
+          role: 'admin',
+          classId: '',
+          createdAt: serverTimestamp(),
+          lastLoginAt: null,
+          streak: 0,
+        });
+
+        status.className = 'success';
+        status.textContent = `✓ 管理者アカウント "${id}" を作成しました！メインアプリからログインしてください。`;
+        status.style.display = 'block';
+        btn.textContent = '作成完了';
+      } catch (err) {
+        btn.disabled = false; btn.textContent = '管理者アカウントを作成';
+        if (err.code === 'auth/email-already-in-use') {
+          showErr('このIDは既に使用されています');
+        } else {
+          showErr(`エラー: ${err.message}`);
+        }
+      }
+
+      function showErr(msg) {
+        status.className = 'error';
+        status.textContent = msg;
+        status.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
